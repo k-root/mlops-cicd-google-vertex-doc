@@ -1,0 +1,122 @@
+# PIPELINE DEFINITION
+# Name: process-data
+# Inputs:
+#    project_id: str
+# Outputs:
+#    data: system.Dataset
+components:
+  comp-process-data:
+    executorLabel: exec-process-data
+    inputDefinitions:
+      parameters:
+        project_id:
+          parameterType: STRING
+    outputDefinitions:
+      artifacts:
+        data:
+          artifactType:
+            schemaTitle: system.Dataset
+            schemaVersion: 0.0.1
+deploymentSpec:
+  executors:
+    exec-process-data:
+      container:
+        args:
+        - --executor_input
+        - '{{$}}'
+        - --function_to_execute
+        - process_data
+        command:
+        - sh
+        - -c
+        - "\nif ! [ -x \"$(command -v pip)\" ]; then\n    python3 -m ensurepip ||\
+          \ python3 -m ensurepip --user || apt-get install python3-pip\nfi\n\nPIP_DISABLE_PIP_VERSION_CHECK=1\
+          \ python3 -m pip install --quiet --no-warn-script-location 'google-cloud-aiplatform'\
+          \ 'pandas' 'joblib==1.2.0' 'scikit-learn' 'google-cloud-bigquery' 'google-cloud-bigquery-storage'\
+          \ 'google-cloud-storage' 'google-cloud-pipeline-components' 'db-dtypes'\
+          \ 'kfp' && \"$0\" \"$@\"\n"
+        - sh
+        - -ec
+        - 'program_path=$(mktemp -d)
+
+
+          printf "%s" "$0" > "$program_path/ephemeral_component.py"
+
+          _KFP_RUNTIME=true python3 -m kfp.dsl.executor_main                         --component_module_path                         "$program_path/ephemeral_component.py"                         "$@"
+
+          '
+        - "\nimport kfp\nfrom kfp import dsl\nfrom kfp.dsl import *\nfrom typing import\
+          \ *\n\ndef process_data(project_id: str, data: Output[Dataset]): \n    from\
+          \ google.cloud import bigquery\n    from google.cloud import bigquery_storage\n\
+          \    from google.cloud import storage\n    from google.cloud import aiplatform\n\
+          \    import numpy as np\n    import pandas as pd\n    from scipy import\
+          \ stats\n    import os\n    from joblib import dump\n\n    BQ_DATASET =\
+          \ 'chicago_taxi_trips'\n    BQ_TABLE = 'taxi_trips'\n    BQ_QUERY = \"\"\
+          \"\n    with tmp_table as (\n    SELECT trip_seconds, trip_miles, fare,\
+          \ \n        tolls,  company, \n        pickup_latitude, pickup_longitude,\
+          \ dropoff_latitude, dropoff_longitude,\n        DATETIME(trip_start_timestamp,\
+          \ 'America/Chicago') trip_start_timestamp,\n        DATETIME(trip_end_timestamp,\
+          \ 'America/Chicago') trip_end_timestamp,\n        CASE WHEN (pickup_community_area\
+          \ IN (56, 64, 76)) OR (dropoff_community_area IN (56, 64, 76)) THEN 1 else\
+          \ 0 END is_airport,\n    FROM `springml-notebook-testing.mlops_tutorial.chicago_taxitrips_prep`\n\
+          \    WHERE\n      dropoff_latitude IS NOT NULL and\n      dropoff_longitude\
+          \ IS NOT NULL and\n      pickup_latitude IS NOT NULL and\n      pickup_longitude\
+          \ IS NOT NULL and\n      fare > 0 and \n      trip_miles > 0\n      and\
+          \ MOD(ABS(FARM_FINGERPRINT(unique_key)), 100) {}\n    ORDER BY RAND()\n\
+          \    LIMIT 200000)\n    SELECT *,\n        EXTRACT(YEAR FROM trip_start_timestamp)\
+          \ trip_start_year,\n        EXTRACT(MONTH FROM trip_start_timestamp) trip_start_month,\n\
+          \        EXTRACT(DAY FROM trip_start_timestamp) trip_start_day,\n      \
+          \  EXTRACT(HOUR FROM trip_start_timestamp) trip_start_hour,\n        FORMAT_DATE('%a',\
+          \ DATE(trip_start_timestamp)) trip_start_day_of_week\n    FROM tmp_table\n\
+          \    \"\"\"\n\n\n    bqclient = bigquery.Client(project=project_id,)\n \
+          \   bqstorageclient = bigquery_storage.BigQueryReadClient()\n    df = (\n\
+          \        bqclient.query(BQ_QUERY.format('between 0 and 99'))\n        .result()\n\
+          \        .to_dataframe(bqstorage_client=bqstorageclient)\n    )\n    # display(df.info())\n\
+          \n    def feature_engineering(data):\n        # Add 'N/A' for missing 'Company'\n\
+          \        data.fillna(value={'company':'N/A','tolls':0}, inplace=True)\n\
+          \        # Drop rows contains null data.\n        data.dropna(how='any',\
+          \ axis='rows', inplace=True)\n        # Pickup and dropoff locations distance\n\
+          \        data['abs_distance'] = (np.hypot(data['dropoff_latitude']-data['pickup_latitude'],\
+          \ data['dropoff_longitude']-data['pickup_longitude']))*100\n\n        #\
+          \ Remove extremes, outliers\n        possible_outliers_cols = ['trip_seconds',\
+          \ 'trip_miles', 'fare', 'abs_distance']\n        data=data[(np.abs(stats.zscore(data[possible_outliers_cols].astype(float)))\
+          \ < 3).all(axis=1)].copy()\n        # Reduce location accuracy\n       \
+          \ data=data.round({'pickup_latitude': 3, 'pickup_longitude': 3, 'dropoff_latitude':3,\
+          \ 'dropoff_longitude':3})\n        return data\n    df=feature_engineering(df)\n\
+          \    # display(df.describe())\n\n    df.to_csv(data.path + \".csv\" , index=False,\
+          \ encoding='utf-8-sig')\n\n"
+        image: python:3.9
+pipelineInfo:
+  name: process-data
+root:
+  dag:
+    outputs:
+      artifacts:
+        data:
+          artifactSelectors:
+          - outputArtifactKey: data
+            producerSubtask: process-data
+    tasks:
+      process-data:
+        cachingOptions:
+          enableCache: true
+        componentRef:
+          name: comp-process-data
+        inputs:
+          parameters:
+            project_id:
+              componentInputParameter: project_id
+        taskInfo:
+          name: process-data
+  inputDefinitions:
+    parameters:
+      project_id:
+        parameterType: STRING
+  outputDefinitions:
+    artifacts:
+      data:
+        artifactType:
+          schemaTitle: system.Dataset
+          schemaVersion: 0.0.1
+schemaVersion: 2.1.0
+sdkVersion: kfp-2.3.0

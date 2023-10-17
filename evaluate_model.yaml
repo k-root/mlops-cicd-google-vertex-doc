@@ -1,0 +1,143 @@
+# PIPELINE DEFINITION
+# Name: evaluate-model
+# Inputs:
+#    metric_name: str
+#    metric_threshold: float
+#    y: system.Dataset
+# Outputs:
+#    Output: str
+#    evaluate-model-experiment_metrics: system.Metrics
+#    experiment_metrics: system.Metrics
+components:
+  comp-evaluate-model:
+    executorLabel: exec-evaluate-model
+    inputDefinitions:
+      artifacts:
+        y:
+          artifactType:
+            schemaTitle: system.Dataset
+            schemaVersion: 0.0.1
+      parameters:
+        metric_name:
+          parameterType: STRING
+        metric_threshold:
+          parameterType: NUMBER_DOUBLE
+    outputDefinitions:
+      artifacts:
+        experiment_metrics:
+          artifactType:
+            schemaTitle: system.Metrics
+            schemaVersion: 0.0.1
+      parameters:
+        Output:
+          parameterType: STRING
+deploymentSpec:
+  executors:
+    exec-evaluate-model:
+      container:
+        args:
+        - --executor_input
+        - '{{$}}'
+        - --function_to_execute
+        - evaluate_model
+        command:
+        - sh
+        - -c
+        - "\nif ! [ -x \"$(command -v pip)\" ]; then\n    python3 -m ensurepip ||\
+          \ python3 -m ensurepip --user || apt-get install python3-pip\nfi\n\nPIP_DISABLE_PIP_VERSION_CHECK=1\
+          \ python3 -m pip install --quiet --no-warn-script-location 'google-cloud-aiplatform'\
+          \ 'pandas' 'joblib==1.2.0' 'pandas' 'scikit-learn' 'google-cloud-pipeline-components'\
+          \ 'kfp' && \"$0\" \"$@\"\n"
+        - sh
+        - -ec
+        - 'program_path=$(mktemp -d)
+
+
+          printf "%s" "$0" > "$program_path/ephemeral_component.py"
+
+          _KFP_RUNTIME=true python3 -m kfp.dsl.executor_main                         --component_module_path                         "$program_path/ephemeral_component.py"                         "$@"
+
+          '
+        - "\nimport kfp\nfrom kfp import dsl\nfrom kfp.dsl import *\nfrom typing import\
+          \ *\n\ndef evaluate_model(metric_name: str, \n                   metric_threshold:\
+          \ float, \n                   y: Input[Dataset],\n                   experiment_metrics:\
+          \ Output[Metrics]) ->str:\n    from sklearn import metrics\n    import pandas\
+          \ as pd\n    import numpy as np\n    scores = {}\n    threshold_flag = \"\
+          false\"\n    df = pd.read_csv(y.path+\".csv\")\n\n    def evaluate_model_mae(pred,\
+          \ test_labels):\n        mae = metrics.mean_absolute_error(test_labels,\
+          \ pred)\n        return mae\n\n    # Evaluate predictions with RMSE\n  \
+          \  def evaluate_model_rmse(pred, test_labels):\n\n        rmse = np.sqrt(np.mean((test_labels\
+          \ - pred)**2))\n        return rmse    \n    scores['r2_score'] = metrics.r2_score(df['y_test'],\
+          \ df['y_pred'])\n    scores['d2_score'] = metrics.d2_tweedie_score(df['y_test'],\
+          \ df['y_pred'])\n\n    print(\"Evaluation SCORES:\",scores)\n\n    try:\n\
+          \        mae = evaluate_model_mae(df['y_pred'],df['y_test'])\n        rmse\
+          \ = evaluate_model_rmse(df['y_pred'],df['y_test'])\n        experiment_metrics.log_metric(\"\
+          mae\", mae.tolist()) \n        experiment_metrics.log_metric(\"rmse\", rmse.tolist())\
+          \ \n    except Exception as err:\n        print(\"ERROR IN MAE AND RMSE\
+          \ Scores: \", err)\n    if scores[metric_name] > metric_threshold:\n   \
+          \     print(\"THRESHOLD PASS\")\n        threshold_flag = \"true\"\n   \
+          \     return \"true\"\n    print(\"FAILED THRESHOLD\")\n    return \"false\"\
+          \n\n"
+        image: python:3.9
+pipelineInfo:
+  name: evaluate-model
+root:
+  dag:
+    outputs:
+      artifacts:
+        evaluate-model-experiment_metrics:
+          artifactSelectors:
+          - outputArtifactKey: experiment_metrics
+            producerSubtask: evaluate-model
+        experiment_metrics:
+          artifactSelectors:
+          - outputArtifactKey: experiment_metrics
+            producerSubtask: evaluate-model
+      parameters:
+        Output:
+          valueFromParameter:
+            outputParameterKey: Output
+            producerSubtask: evaluate-model
+    tasks:
+      evaluate-model:
+        cachingOptions:
+          enableCache: true
+        componentRef:
+          name: comp-evaluate-model
+        inputs:
+          artifacts:
+            y:
+              componentInputArtifact: y
+          parameters:
+            metric_name:
+              componentInputParameter: metric_name
+            metric_threshold:
+              componentInputParameter: metric_threshold
+        taskInfo:
+          name: evaluate-model
+  inputDefinitions:
+    artifacts:
+      y:
+        artifactType:
+          schemaTitle: system.Dataset
+          schemaVersion: 0.0.1
+    parameters:
+      metric_name:
+        parameterType: STRING
+      metric_threshold:
+        parameterType: NUMBER_DOUBLE
+  outputDefinitions:
+    artifacts:
+      evaluate-model-experiment_metrics:
+        artifactType:
+          schemaTitle: system.Metrics
+          schemaVersion: 0.0.1
+      experiment_metrics:
+        artifactType:
+          schemaTitle: system.Metrics
+          schemaVersion: 0.0.1
+    parameters:
+      Output:
+        parameterType: STRING
+schemaVersion: 2.1.0
+sdkVersion: kfp-2.3.0

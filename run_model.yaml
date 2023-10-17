@@ -1,0 +1,116 @@
+# PIPELINE DEFINITION
+# Name: run-model
+# Inputs:
+#    data: system.Dataset
+#    final_model: system.Model
+# Outputs:
+#    y_dataset: system.Dataset
+components:
+  comp-run-model:
+    executorLabel: exec-run-model
+    inputDefinitions:
+      artifacts:
+        data:
+          artifactType:
+            schemaTitle: system.Dataset
+            schemaVersion: 0.0.1
+        final_model:
+          artifactType:
+            schemaTitle: system.Model
+            schemaVersion: 0.0.1
+    outputDefinitions:
+      artifacts:
+        y_dataset:
+          artifactType:
+            schemaTitle: system.Dataset
+            schemaVersion: 0.0.1
+deploymentSpec:
+  executors:
+    exec-run-model:
+      container:
+        args:
+        - --executor_input
+        - '{{$}}'
+        - --function_to_execute
+        - run_model
+        command:
+        - sh
+        - -c
+        - "\nif ! [ -x \"$(command -v pip)\" ]; then\n    python3 -m ensurepip ||\
+          \ python3 -m ensurepip --user || apt-get install python3-pip\nfi\n\nPIP_DISABLE_PIP_VERSION_CHECK=1\
+          \ python3 -m pip install --quiet --no-warn-script-location 'scikit-learn'\
+          \ 'google-cloud-pipeline-components' 'pandas' 'kfp' && \"$0\" \"$@\"\n"
+        - sh
+        - -ec
+        - 'program_path=$(mktemp -d)
+
+
+          printf "%s" "$0" > "$program_path/ephemeral_component.py"
+
+          _KFP_RUNTIME=true python3 -m kfp.dsl.executor_main                         --component_module_path                         "$program_path/ephemeral_component.py"                         "$@"
+
+          '
+        - "\nimport kfp\nfrom kfp import dsl\nfrom kfp.dsl import *\nfrom typing import\
+          \ *\n\ndef run_model(final_model:Input[Model],data: Input[Dataset], y_dataset:\
+          \ Output[Dataset]):\n    import pandas as pd\n    from sklearn.compose import\
+          \ ColumnTransformer\n    from sklearn.model_selection import train_test_split,\
+          \ cross_val_score, GridSearchCV\n    from sklearn.pipeline import Pipeline\n\
+          \    from sklearn.preprocessing import OneHotEncoder, StandardScaler\n \
+          \   import pickle\n\n    df = pd.read_csv(data.path+\".csv\")\n    X=df.drop(['trip_start_timestamp'],axis=1)\n\
+          \    y=df['fare']\n    ct_pipe = ColumnTransformer(transformers=[\n    \
+          \    ('hourly_cat', OneHotEncoder(categories=[range(0,24)], sparse = False),\
+          \ ['trip_start_hour']),\n        ('dow', OneHotEncoder(categories=[['Mon',\
+          \ 'Tue', 'Sun', 'Wed', 'Sat', 'Fri', 'Thu']], sparse = False), ['trip_start_day_of_week']),\n\
+          \        ('std_scaler', StandardScaler(), [\n            'trip_start_year',\n\
+          \            'abs_distance',\n            'pickup_longitude',\n        \
+          \    'pickup_latitude',\n            'dropoff_longitude',\n            'dropoff_latitude',\n\
+          \            'trip_miles',\n            'trip_seconds'])\n    ])\n\n   \
+          \ X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.25,\
+          \ random_state=123)\n\n    file_name = final_model.path\n    with open(file_name+'.pkl',\
+          \ 'rb') as file:  \n        latest_model = pickle.load(file)\n\n    y_pred\
+          \ = latest_model.predict(X_test.drop('fare',axis=1))\n    y_df = pd.DataFrame({'y_pred':y_pred,'y_test':y_test},\
+          \ columns = ['y_pred','y_test'])\n    y_df.to_csv(y_dataset.path + \".csv\"\
+          \ , index=False, encoding='utf-8-sig')\n\n"
+        image: python:3.9
+pipelineInfo:
+  name: run-model
+root:
+  dag:
+    outputs:
+      artifacts:
+        y_dataset:
+          artifactSelectors:
+          - outputArtifactKey: y_dataset
+            producerSubtask: run-model
+    tasks:
+      run-model:
+        cachingOptions:
+          enableCache: true
+        componentRef:
+          name: comp-run-model
+        inputs:
+          artifacts:
+            data:
+              componentInputArtifact: data
+            final_model:
+              componentInputArtifact: final_model
+        taskInfo:
+          name: run-model
+  inputDefinitions:
+    artifacts:
+      data:
+        artifactType:
+          schemaTitle: system.Dataset
+          schemaVersion: 0.0.1
+      final_model:
+        artifactType:
+          schemaTitle: system.Model
+          schemaVersion: 0.0.1
+  outputDefinitions:
+    artifacts:
+      y_dataset:
+        artifactType:
+          schemaTitle: system.Dataset
+          schemaVersion: 0.0.1
+schemaVersion: 2.1.0
+sdkVersion: kfp-2.3.0

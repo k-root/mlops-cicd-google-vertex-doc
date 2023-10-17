@@ -1,0 +1,124 @@
+# PIPELINE DEFINITION
+# Name: upload-model-to-vertex
+# Inputs:
+#    display_name: str
+#    final_model: system.Model
+#    project: str
+# Outputs:
+#    Output: str
+components:
+  comp-upload-model-to-vertex:
+    executorLabel: exec-upload-model-to-vertex
+    inputDefinitions:
+      artifacts:
+        final_model:
+          artifactType:
+            schemaTitle: system.Model
+            schemaVersion: 0.0.1
+      parameters:
+        display_name:
+          parameterType: STRING
+        project:
+          parameterType: STRING
+    outputDefinitions:
+      parameters:
+        Output:
+          parameterType: STRING
+deploymentSpec:
+  executors:
+    exec-upload-model-to-vertex:
+      container:
+        args:
+        - --executor_input
+        - '{{$}}'
+        - --function_to_execute
+        - upload_model_to_vertex
+        command:
+        - sh
+        - -c
+        - "\nif ! [ -x \"$(command -v pip)\" ]; then\n    python3 -m ensurepip ||\
+          \ python3 -m ensurepip --user || apt-get install python3-pip\nfi\n\nPIP_DISABLE_PIP_VERSION_CHECK=1\
+          \ python3 -m pip install --quiet --no-warn-script-location 'google-cloud-aiplatform'\
+          \ 'pandas' 'joblib==1.2.0' 'pandas' 'scikit-learn' 'google-cloud-pipeline-components'\
+          \ 'kfp' && \"$0\" \"$@\"\n"
+        - sh
+        - -ec
+        - 'program_path=$(mktemp -d)
+
+
+          printf "%s" "$0" > "$program_path/ephemeral_component.py"
+
+          _KFP_RUNTIME=true python3 -m kfp.dsl.executor_main                         --component_module_path                         "$program_path/ephemeral_component.py"                         "$@"
+
+          '
+        - "\nimport kfp\nfrom kfp import dsl\nfrom kfp.dsl import *\nfrom typing import\
+          \ *\n\ndef upload_model_to_vertex(\n      project : str,\n      final_model:Input[Model],\n\
+          \      # sklearn_version = None,\n      display_name: str,\n      # description:\
+          \ str,\n\n      # Uncomment when anyone requests these:\n      # instance_schema_uri:\
+          \ str = None,\n      # parameters_schema_uri: str = None,\n      # prediction_schema_uri:\
+          \ str = None,\n      # explanation_metadata: \"google.cloud.aiplatform_v1.types.explanation_metadata.ExplanationMetadata\"\
+          \ = None,\n      # explanation_parameters: \"google.cloud.aiplatform_v1.types.explanation.ExplanationParameters\"\
+          \ = None,\n\n#       project : str,\n#       location : str,\n      # labels\
+          \ : None,\n      # encryption_spec_key_name: str = None,\n      # staging_bucket\
+          \ = None,\n  ) ->str :\n    import json\n    import os\n    import shutil\n\
+          \    import tempfile\n    from google.cloud import aiplatform\n\n    # labels[\"\
+          component-source\"] = \"github-com-ark-kun-pipeline-components\"\n\n   \
+          \ # The serving container decides the model type based on the model file\
+          \ extension.\n    # So we need to rename the mode file (e.g. /tmp/inputs/model/data)\
+          \ to *.pkl\n    model_file_name = final_model.path\n    # _, renamed_model_path\
+          \ = tempfile.mkstemp(suffix=\".pkl\")\n    # shutil.copyfile(src=model_path,\
+          \ dst=renamed_model_path)\n\n    model = aiplatform.Model.upload_scikit_learn_model_file(\n\
+          \      model_file_path=model_file_name+'.pkl',\n      # sklearn_version=sklearn_version,\n\
+          \      display_name=display_name,\n      # description=description,\n\n\
+          \      # instance_schema_uri=instance_schema_uri,\n      # parameters_schema_uri=parameters_schema_uri,\n\
+          \      # prediction_schema_uri=prediction_schema_uri,\n      # explanation_metadata=explanation_metadata,\n\
+          \      # explanation_parameters=explanation_parameters,\n\n      # project=PROJECT_ID,\n\
+          \      # location=location,\n      # labels=labels,\n      # encryption_spec_key_name=encryption_spec_key_name,\n\
+          \      # staging_bucket=staging_bucket,\n    )\n    model_json = json.dumps(model.to_dict(),\
+          \ indent=2)\n    print(model_json)\n    print(model.resource_name)\n   \
+          \ return (model.resource_name)\n\n"
+        image: python:3.9
+pipelineInfo:
+  name: upload-model-to-vertex
+root:
+  dag:
+    outputs:
+      parameters:
+        Output:
+          valueFromParameter:
+            outputParameterKey: Output
+            producerSubtask: upload-model-to-vertex
+    tasks:
+      upload-model-to-vertex:
+        cachingOptions:
+          enableCache: true
+        componentRef:
+          name: comp-upload-model-to-vertex
+        inputs:
+          artifacts:
+            final_model:
+              componentInputArtifact: final_model
+          parameters:
+            display_name:
+              componentInputParameter: display_name
+            project:
+              componentInputParameter: project
+        taskInfo:
+          name: upload-model-to-vertex
+  inputDefinitions:
+    artifacts:
+      final_model:
+        artifactType:
+          schemaTitle: system.Model
+          schemaVersion: 0.0.1
+    parameters:
+      display_name:
+        parameterType: STRING
+      project:
+        parameterType: STRING
+  outputDefinitions:
+    parameters:
+      Output:
+        parameterType: STRING
+schemaVersion: 2.1.0
+sdkVersion: kfp-2.3.0

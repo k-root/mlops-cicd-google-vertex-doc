@@ -1,0 +1,567 @@
+# PIPELINE DEFINITION
+# Name: mlops-scheduler-tutorial
+# Inputs:
+#    metric: str
+#    project: str [Default: 'springml-notebook-testing']
+#    threshold: float
+# Outputs:
+#    evaluate-model-experiment_metrics: system.Metrics
+components:
+  comp-evaluate-model:
+    executorLabel: exec-evaluate-model
+    inputDefinitions:
+      artifacts:
+        y:
+          artifactType:
+            schemaTitle: system.Dataset
+            schemaVersion: 0.0.1
+      parameters:
+        metric_name:
+          parameterType: STRING
+        metric_threshold:
+          parameterType: NUMBER_DOUBLE
+    outputDefinitions:
+      artifacts:
+        experiment_metrics:
+          artifactType:
+            schemaTitle: system.Metrics
+            schemaVersion: 0.0.1
+      parameters:
+        Output:
+          parameterType: STRING
+  comp-exit-handler-1:
+    dag:
+      outputs:
+        artifacts:
+          evaluate-model-experiment_metrics:
+            artifactSelectors:
+            - outputArtifactKey: experiment_metrics
+              producerSubtask: evaluate-model
+      tasks:
+        evaluate-model:
+          cachingOptions:
+            enableCache: true
+          componentRef:
+            name: comp-evaluate-model
+          dependentTasks:
+          - run-model
+          inputs:
+            artifacts:
+              y:
+                taskOutputArtifact:
+                  outputArtifactKey: y_dataset
+                  producerTask: run-model
+            parameters:
+              metric_name:
+                componentInputParameter: pipelinechannel--metric
+              metric_threshold:
+                componentInputParameter: pipelinechannel--threshold
+          taskInfo:
+            name: evaluate-model
+        process-data:
+          cachingOptions:
+            enableCache: true
+          componentRef:
+            name: comp-process-data
+          inputs:
+            parameters:
+              project_id:
+                componentInputParameter: pipelinechannel--project
+          taskInfo:
+            name: process-data
+        run-model:
+          cachingOptions:
+            enableCache: true
+          componentRef:
+            name: comp-run-model
+          dependentTasks:
+          - process-data
+          - train-model
+          inputs:
+            artifacts:
+              data:
+                taskOutputArtifact:
+                  outputArtifactKey: data
+                  producerTask: process-data
+              final_model:
+                taskOutputArtifact:
+                  outputArtifactKey: model_artifact
+                  producerTask: train-model
+          taskInfo:
+            name: run-model
+        train-model:
+          cachingOptions:
+            enableCache: true
+          componentRef:
+            name: comp-train-model
+          dependentTasks:
+          - process-data
+          inputs:
+            artifacts:
+              data:
+                taskOutputArtifact:
+                  outputArtifactKey: data
+                  producerTask: process-data
+            parameters:
+              model_directory:
+                runtimeValue:
+                  constant: gs://springml-notebook-testing-mlops-artifacts/pipeline_root/chicago-taxi-pipe/mlops-scheduler-tutorial
+          taskInfo:
+            name: train-model
+        upload-model-to-vertex:
+          cachingOptions:
+            enableCache: true
+          componentRef:
+            name: comp-upload-model-to-vertex
+          dependentTasks:
+          - train-model
+          inputs:
+            artifacts:
+              final_model:
+                taskOutputArtifact:
+                  outputArtifactKey: model_artifact
+                  producerTask: train-model
+            parameters:
+              display_name:
+                runtimeValue:
+                  constant: mlops-vertex-ct-model
+              project:
+                componentInputParameter: pipelinechannel--project
+          taskInfo:
+            name: upload-model-to-vertex
+    inputDefinitions:
+      parameters:
+        pipelinechannel--metric:
+          parameterType: STRING
+        pipelinechannel--project:
+          parameterType: STRING
+        pipelinechannel--threshold:
+          parameterType: NUMBER_DOUBLE
+    outputDefinitions:
+      artifacts:
+        evaluate-model-experiment_metrics:
+          artifactType:
+            schemaTitle: system.Metrics
+            schemaVersion: 0.0.1
+  comp-process-data:
+    executorLabel: exec-process-data
+    inputDefinitions:
+      parameters:
+        project_id:
+          parameterType: STRING
+    outputDefinitions:
+      artifacts:
+        data:
+          artifactType:
+            schemaTitle: system.Dataset
+            schemaVersion: 0.0.1
+  comp-run-model:
+    executorLabel: exec-run-model
+    inputDefinitions:
+      artifacts:
+        data:
+          artifactType:
+            schemaTitle: system.Dataset
+            schemaVersion: 0.0.1
+        final_model:
+          artifactType:
+            schemaTitle: system.Model
+            schemaVersion: 0.0.1
+    outputDefinitions:
+      artifacts:
+        y_dataset:
+          artifactType:
+            schemaTitle: system.Dataset
+            schemaVersion: 0.0.1
+  comp-train-model:
+    executorLabel: exec-train-model
+    inputDefinitions:
+      artifacts:
+        data:
+          artifactType:
+            schemaTitle: system.Dataset
+            schemaVersion: 0.0.1
+      parameters:
+        model_directory:
+          parameterType: STRING
+    outputDefinitions:
+      artifacts:
+        model_artifact:
+          artifactType:
+            schemaTitle: system.Model
+            schemaVersion: 0.0.1
+  comp-upload-model-to-vertex:
+    executorLabel: exec-upload-model-to-vertex
+    inputDefinitions:
+      artifacts:
+        final_model:
+          artifactType:
+            schemaTitle: system.Model
+            schemaVersion: 0.0.1
+      parameters:
+        display_name:
+          parameterType: STRING
+        project:
+          parameterType: STRING
+    outputDefinitions:
+      parameters:
+        Output:
+          parameterType: STRING
+  comp-vertex-pipelines-notification-email:
+    executorLabel: exec-vertex-pipelines-notification-email
+    inputDefinitions:
+      parameters:
+        pipeline_task_final_status:
+          isOptional: true
+          parameterType: TASK_FINAL_STATUS
+        recipients:
+          description: A list of email addresses to send a notification to.
+          parameterType: LIST
+deploymentSpec:
+  executors:
+    exec-evaluate-model:
+      container:
+        args:
+        - --executor_input
+        - '{{$}}'
+        - --function_to_execute
+        - evaluate_model
+        command:
+        - sh
+        - -c
+        - "\nif ! [ -x \"$(command -v pip)\" ]; then\n    python3 -m ensurepip ||\
+          \ python3 -m ensurepip --user || apt-get install python3-pip\nfi\n\nPIP_DISABLE_PIP_VERSION_CHECK=1\
+          \ python3 -m pip install --quiet --no-warn-script-location 'google-cloud-aiplatform'\
+          \ 'pandas' 'joblib==1.2.0' 'pandas' 'scikit-learn' 'google-cloud-pipeline-components'\
+          \ 'kfp' && \"$0\" \"$@\"\n"
+        - sh
+        - -ec
+        - 'program_path=$(mktemp -d)
+
+
+          printf "%s" "$0" > "$program_path/ephemeral_component.py"
+
+          _KFP_RUNTIME=true python3 -m kfp.dsl.executor_main                         --component_module_path                         "$program_path/ephemeral_component.py"                         "$@"
+
+          '
+        - "\nimport kfp\nfrom kfp import dsl\nfrom kfp.dsl import *\nfrom typing import\
+          \ *\n\ndef evaluate_model(metric_name: str, \n                   metric_threshold:\
+          \ float, \n                   y: Input[Dataset],\n                   experiment_metrics:\
+          \ Output[Metrics]) ->str:\n    from sklearn import metrics\n    import pandas\
+          \ as pd\n    import numpy as np\n    scores = {}\n    threshold_flag = \"\
+          false\"\n    df = pd.read_csv(y.path+\".csv\")\n\n    def evaluate_model_mae(pred,\
+          \ test_labels):\n        mae = metrics.mean_absolute_error(test_labels,\
+          \ pred)\n        return mae\n\n    # Evaluate predictions with RMSE\n  \
+          \  def evaluate_model_rmse(pred, test_labels):\n\n        rmse = np.sqrt(np.mean((test_labels\
+          \ - pred)**2))\n        return rmse    \n    scores['r2_score'] = metrics.r2_score(df['y_test'],\
+          \ df['y_pred'])\n    scores['d2_score'] = metrics.d2_tweedie_score(df['y_test'],\
+          \ df['y_pred'])\n\n    print(\"Evaluation SCORES:\",scores)\n\n    try:\n\
+          \        mae = evaluate_model_mae(df['y_pred'],df['y_test'])\n        rmse\
+          \ = evaluate_model_rmse(df['y_pred'],df['y_test'])\n        experiment_metrics.log_metric(\"\
+          mae\", mae.tolist()) \n        experiment_metrics.log_metric(\"rmse\", rmse.tolist())\
+          \ \n    except Exception as err:\n        print(\"ERROR IN MAE AND RMSE\
+          \ Scores: \", err)\n    if scores[metric_name] > metric_threshold:\n   \
+          \     print(\"THRESHOLD PASS\")\n        threshold_flag = \"true\"\n   \
+          \     return \"true\"\n    print(\"FAILED THRESHOLD\")\n    return \"false\"\
+          \n\n"
+        image: python:3.9
+    exec-process-data:
+      container:
+        args:
+        - --executor_input
+        - '{{$}}'
+        - --function_to_execute
+        - process_data
+        command:
+        - sh
+        - -c
+        - "\nif ! [ -x \"$(command -v pip)\" ]; then\n    python3 -m ensurepip ||\
+          \ python3 -m ensurepip --user || apt-get install python3-pip\nfi\n\nPIP_DISABLE_PIP_VERSION_CHECK=1\
+          \ python3 -m pip install --quiet --no-warn-script-location 'google-cloud-aiplatform'\
+          \ 'pandas' 'joblib==1.2.0' 'scikit-learn' 'google-cloud-bigquery' 'google-cloud-bigquery-storage'\
+          \ 'google-cloud-storage' 'google-cloud-pipeline-components' 'db-dtypes'\
+          \ 'kfp' && \"$0\" \"$@\"\n"
+        - sh
+        - -ec
+        - 'program_path=$(mktemp -d)
+
+
+          printf "%s" "$0" > "$program_path/ephemeral_component.py"
+
+          _KFP_RUNTIME=true python3 -m kfp.dsl.executor_main                         --component_module_path                         "$program_path/ephemeral_component.py"                         "$@"
+
+          '
+        - "\nimport kfp\nfrom kfp import dsl\nfrom kfp.dsl import *\nfrom typing import\
+          \ *\n\ndef process_data(project_id: str, data: Output[Dataset]): \n    from\
+          \ google.cloud import bigquery\n    from google.cloud import bigquery_storage\n\
+          \    from google.cloud import storage\n    from google.cloud import aiplatform\n\
+          \    import numpy as np\n    import pandas as pd\n    from scipy import\
+          \ stats\n    import os\n    from joblib import dump\n\n    BQ_DATASET =\
+          \ 'chicago_taxi_trips'\n    BQ_TABLE = 'taxi_trips'\n    BQ_QUERY = \"\"\
+          \"\n    with tmp_table as (\n    SELECT trip_seconds, trip_miles, fare,\
+          \ \n        tolls,  company, \n        pickup_latitude, pickup_longitude,\
+          \ dropoff_latitude, dropoff_longitude,\n        DATETIME(trip_start_timestamp,\
+          \ 'America/Chicago') trip_start_timestamp,\n        DATETIME(trip_end_timestamp,\
+          \ 'America/Chicago') trip_end_timestamp,\n        CASE WHEN (pickup_community_area\
+          \ IN (56, 64, 76)) OR (dropoff_community_area IN (56, 64, 76)) THEN 1 else\
+          \ 0 END is_airport,\n    FROM `springml-notebook-testing.mlops_tutorial.chicago_taxitrips_prep`\n\
+          \    WHERE\n      dropoff_latitude IS NOT NULL and\n      dropoff_longitude\
+          \ IS NOT NULL and\n      pickup_latitude IS NOT NULL and\n      pickup_longitude\
+          \ IS NOT NULL and\n      fare > 0 and \n      trip_miles > 0\n      and\
+          \ MOD(ABS(FARM_FINGERPRINT(unique_key)), 100) {}\n    ORDER BY RAND()\n\
+          \    LIMIT 200000)\n    SELECT *,\n        EXTRACT(YEAR FROM trip_start_timestamp)\
+          \ trip_start_year,\n        EXTRACT(MONTH FROM trip_start_timestamp) trip_start_month,\n\
+          \        EXTRACT(DAY FROM trip_start_timestamp) trip_start_day,\n      \
+          \  EXTRACT(HOUR FROM trip_start_timestamp) trip_start_hour,\n        FORMAT_DATE('%a',\
+          \ DATE(trip_start_timestamp)) trip_start_day_of_week\n    FROM tmp_table\n\
+          \    \"\"\"\n\n\n    bqclient = bigquery.Client(project=project_id,)\n \
+          \   bqstorageclient = bigquery_storage.BigQueryReadClient()\n    df = (\n\
+          \        bqclient.query(BQ_QUERY.format('between 0 and 99'))\n        .result()\n\
+          \        .to_dataframe(bqstorage_client=bqstorageclient)\n    )\n    # display(df.info())\n\
+          \n    def feature_engineering(data):\n        # Add 'N/A' for missing 'Company'\n\
+          \        data.fillna(value={'company':'N/A','tolls':0}, inplace=True)\n\
+          \        # Drop rows contains null data.\n        data.dropna(how='any',\
+          \ axis='rows', inplace=True)\n        # Pickup and dropoff locations distance\n\
+          \        data['abs_distance'] = (np.hypot(data['dropoff_latitude']-data['pickup_latitude'],\
+          \ data['dropoff_longitude']-data['pickup_longitude']))*100\n\n        #\
+          \ Remove extremes, outliers\n        possible_outliers_cols = ['trip_seconds',\
+          \ 'trip_miles', 'fare', 'abs_distance']\n        data=data[(np.abs(stats.zscore(data[possible_outliers_cols].astype(float)))\
+          \ < 3).all(axis=1)].copy()\n        # Reduce location accuracy\n       \
+          \ data=data.round({'pickup_latitude': 3, 'pickup_longitude': 3, 'dropoff_latitude':3,\
+          \ 'dropoff_longitude':3})\n        return data\n    df=feature_engineering(df)\n\
+          \    # display(df.describe())\n\n    df.to_csv(data.path + \".csv\" , index=False,\
+          \ encoding='utf-8-sig')\n\n"
+        image: python:3.9
+    exec-run-model:
+      container:
+        args:
+        - --executor_input
+        - '{{$}}'
+        - --function_to_execute
+        - run_model
+        command:
+        - sh
+        - -c
+        - "\nif ! [ -x \"$(command -v pip)\" ]; then\n    python3 -m ensurepip ||\
+          \ python3 -m ensurepip --user || apt-get install python3-pip\nfi\n\nPIP_DISABLE_PIP_VERSION_CHECK=1\
+          \ python3 -m pip install --quiet --no-warn-script-location 'scikit-learn'\
+          \ 'google-cloud-pipeline-components' 'pandas' 'kfp' && \"$0\" \"$@\"\n"
+        - sh
+        - -ec
+        - 'program_path=$(mktemp -d)
+
+
+          printf "%s" "$0" > "$program_path/ephemeral_component.py"
+
+          _KFP_RUNTIME=true python3 -m kfp.dsl.executor_main                         --component_module_path                         "$program_path/ephemeral_component.py"                         "$@"
+
+          '
+        - "\nimport kfp\nfrom kfp import dsl\nfrom kfp.dsl import *\nfrom typing import\
+          \ *\n\ndef run_model(final_model:Input[Model],data: Input[Dataset], y_dataset:\
+          \ Output[Dataset]):\n    import pandas as pd\n    from sklearn.compose import\
+          \ ColumnTransformer\n    from sklearn.model_selection import train_test_split,\
+          \ cross_val_score, GridSearchCV\n    from sklearn.pipeline import Pipeline\n\
+          \    from sklearn.preprocessing import OneHotEncoder, StandardScaler\n \
+          \   import pickle\n\n    df = pd.read_csv(data.path+\".csv\")\n    X=df.drop(['trip_start_timestamp'],axis=1)\n\
+          \    y=df['fare']\n    ct_pipe = ColumnTransformer(transformers=[\n    \
+          \    ('hourly_cat', OneHotEncoder(categories=[range(0,24)], sparse = False),\
+          \ ['trip_start_hour']),\n        ('dow', OneHotEncoder(categories=[['Mon',\
+          \ 'Tue', 'Sun', 'Wed', 'Sat', 'Fri', 'Thu']], sparse = False), ['trip_start_day_of_week']),\n\
+          \        ('std_scaler', StandardScaler(), [\n            'trip_start_year',\n\
+          \            'abs_distance',\n            'pickup_longitude',\n        \
+          \    'pickup_latitude',\n            'dropoff_longitude',\n            'dropoff_latitude',\n\
+          \            'trip_miles',\n            'trip_seconds'])\n    ])\n\n   \
+          \ X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.25,\
+          \ random_state=123)\n\n    file_name = final_model.path\n    with open(file_name+'.pkl',\
+          \ 'rb') as file:  \n        latest_model = pickle.load(file)\n\n    y_pred\
+          \ = latest_model.predict(X_test.drop('fare',axis=1))\n    y_df = pd.DataFrame({'y_pred':y_pred,'y_test':y_test},\
+          \ columns = ['y_pred','y_test'])\n    y_df.to_csv(y_dataset.path + \".csv\"\
+          \ , index=False, encoding='utf-8-sig')\n\n"
+        image: python:3.9
+    exec-train-model:
+      container:
+        args:
+        - --executor_input
+        - '{{$}}'
+        - --function_to_execute
+        - train_model
+        command:
+        - sh
+        - -c
+        - "\nif ! [ -x \"$(command -v pip)\" ]; then\n    python3 -m ensurepip ||\
+          \ python3 -m ensurepip --user || apt-get install python3-pip\nfi\n\nPIP_DISABLE_PIP_VERSION_CHECK=1\
+          \ python3 -m pip install --quiet --no-warn-script-location 'google-cloud-aiplatform'\
+          \ 'pandas' 'joblib==1.2.0' 'scikit-learn' 'google-cloud-bigquery' 'google-cloud-bigquery-storage'\
+          \ 'google-cloud-storage' 'google-cloud-pipeline-components' 'db-dtypes'\
+          \ 'kfp' && \"$0\" \"$@\"\n"
+        - sh
+        - -ec
+        - 'program_path=$(mktemp -d)
+
+
+          printf "%s" "$0" > "$program_path/ephemeral_component.py"
+
+          _KFP_RUNTIME=true python3 -m kfp.dsl.executor_main                         --component_module_path                         "$program_path/ephemeral_component.py"                         "$@"
+
+          '
+        - "\nimport kfp\nfrom kfp import dsl\nfrom kfp.dsl import *\nfrom typing import\
+          \ *\n\ndef train_model(model_directory:str ,data: Input[Dataset], model_artifact:\
+          \ Output[Model]):\n    from google.cloud import storage\n    from google.cloud\
+          \ import aiplatform\n    import numpy as np\n    import pandas as pd\n \
+          \   import os\n\n    from sklearn.ensemble import RandomForestRegressor\n\
+          \    from sklearn.compose import ColumnTransformer\n    from sklearn.model_selection\
+          \ import train_test_split, cross_val_score\n    from sklearn.pipeline import\
+          \ Pipeline\n    from sklearn.preprocessing import OneHotEncoder, StandardScaler\n\
+          \    from joblib import dump\n    import pickle\n\n    df = pd.read_csv(data.path+\"\
+          .csv\")\n    X=df.drop(['trip_start_timestamp'],axis=1)\n    y=df['fare']\n\
+          \    ct_pipe = ColumnTransformer(transformers=[\n        ('hourly_cat',\
+          \ OneHotEncoder(categories=[range(0,24)], sparse = False), ['trip_start_hour']),\n\
+          \        ('dow', OneHotEncoder(categories=[['Mon', 'Tue', 'Sun', 'Wed',\
+          \ 'Sat', 'Fri', 'Thu']], sparse = False), ['trip_start_day_of_week']),\n\
+          \        ('std_scaler', StandardScaler(), [\n            'trip_start_year',\n\
+          \            'abs_distance',\n            'pickup_longitude',\n        \
+          \    'pickup_latitude',\n            'dropoff_longitude',\n            'dropoff_latitude',\n\
+          \            'trip_miles',\n            'trip_seconds'])\n    ])\n\n   \
+          \ X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.25,\
+          \ random_state=123)\n\n    rfr_pipe = Pipeline([\n        ('ct', ct_pipe),\n\
+          \        ('forest_reg', RandomForestRegressor(\n            n_estimators\
+          \ = 20,\n            max_features = 1.0,\n            n_jobs = -1,\n   \
+          \         random_state = 3,\n            max_depth=None,\n            max_leaf_nodes=None,\n\
+          \        ))\n    ])\n\n\n    rfr_score = cross_val_score(rfr_pipe, X_train,\
+          \ y_train, scoring = 'neg_mean_squared_error', cv = 5)\n    rfr_rmse = np.sqrt(-rfr_score)\n\
+          \    rfr_rmse.mean()\n    final_model=rfr_pipe.fit(X_train, y_train)\n\n\
+          \    artifact_filename = 'model.pkl'\n\n    # Save model artifact to local\
+          \ filesystem (doesn't persist)\n    local_path = artifact_filename\n   \
+          \ local_path = model_artifact.path+'.pkl'\n    with open(local_path, 'wb')\
+          \ as model_file:\n      pickle.dump(final_model, model_file)\n\n    # Upload\
+          \ model artifact to Cloud Storage\n    storage_path = os.path.join(model_directory,\
+          \ artifact_filename)\n    blob = storage.blob.Blob.from_string(storage_path,\
+          \ client=storage.Client())\n    blob.upload_from_filename(local_path)\n\n"
+        image: python:3.9
+    exec-upload-model-to-vertex:
+      container:
+        args:
+        - --executor_input
+        - '{{$}}'
+        - --function_to_execute
+        - upload_model_to_vertex
+        command:
+        - sh
+        - -c
+        - "\nif ! [ -x \"$(command -v pip)\" ]; then\n    python3 -m ensurepip ||\
+          \ python3 -m ensurepip --user || apt-get install python3-pip\nfi\n\nPIP_DISABLE_PIP_VERSION_CHECK=1\
+          \ python3 -m pip install --quiet --no-warn-script-location 'google-cloud-aiplatform'\
+          \ 'pandas' 'joblib==1.2.0' 'pandas' 'scikit-learn' 'google-cloud-pipeline-components'\
+          \ 'kfp' && \"$0\" \"$@\"\n"
+        - sh
+        - -ec
+        - 'program_path=$(mktemp -d)
+
+
+          printf "%s" "$0" > "$program_path/ephemeral_component.py"
+
+          _KFP_RUNTIME=true python3 -m kfp.dsl.executor_main                         --component_module_path                         "$program_path/ephemeral_component.py"                         "$@"
+
+          '
+        - "\nimport kfp\nfrom kfp import dsl\nfrom kfp.dsl import *\nfrom typing import\
+          \ *\n\ndef upload_model_to_vertex(\n      project : str,\n      final_model:Input[Model],\n\
+          \      # sklearn_version = None,\n      display_name: str,\n      # description:\
+          \ str,\n\n      # Uncomment when anyone requests these:\n      # instance_schema_uri:\
+          \ str = None,\n      # parameters_schema_uri: str = None,\n      # prediction_schema_uri:\
+          \ str = None,\n      # explanation_metadata: \"google.cloud.aiplatform_v1.types.explanation_metadata.ExplanationMetadata\"\
+          \ = None,\n      # explanation_parameters: \"google.cloud.aiplatform_v1.types.explanation.ExplanationParameters\"\
+          \ = None,\n\n#       project : str,\n#       location : str,\n      # labels\
+          \ : None,\n      # encryption_spec_key_name: str = None,\n      # staging_bucket\
+          \ = None,\n  ) ->str :\n    import json\n    import os\n    import shutil\n\
+          \    import tempfile\n    from google.cloud import aiplatform\n\n    # labels[\"\
+          component-source\"] = \"github-com-ark-kun-pipeline-components\"\n\n   \
+          \ # The serving container decides the model type based on the model file\
+          \ extension.\n    # So we need to rename the mode file (e.g. /tmp/inputs/model/data)\
+          \ to *.pkl\n    model_file_name = final_model.path\n    # _, renamed_model_path\
+          \ = tempfile.mkstemp(suffix=\".pkl\")\n    # shutil.copyfile(src=model_path,\
+          \ dst=renamed_model_path)\n\n    model = aiplatform.Model.upload_scikit_learn_model_file(\n\
+          \      model_file_path=model_file_name+'.pkl',\n      # sklearn_version=sklearn_version,\n\
+          \      display_name=display_name,\n      # description=description,\n\n\
+          \      # instance_schema_uri=instance_schema_uri,\n      # parameters_schema_uri=parameters_schema_uri,\n\
+          \      # prediction_schema_uri=prediction_schema_uri,\n      # explanation_metadata=explanation_metadata,\n\
+          \      # explanation_parameters=explanation_parameters,\n\n      # project=PROJECT_ID,\n\
+          \      # location=location,\n      # labels=labels,\n      # encryption_spec_key_name=encryption_spec_key_name,\n\
+          \      # staging_bucket=staging_bucket,\n    )\n    model_json = json.dumps(model.to_dict(),\
+          \ indent=2)\n    print(model_json)\n    print(model.resource_name)\n   \
+          \ return (model.resource_name)\n\n"
+        image: python:3.9
+    exec-vertex-pipelines-notification-email:
+      container:
+        args:
+        - --type
+        - VertexNotificationEmail
+        - --payload
+        - ''
+        command:
+        - python3
+        - -u
+        - -m
+        - google_cloud_pipeline_components.container.v1.vertex_notification_email.executor
+        image: gcr.io/ml-pipeline/google-cloud-pipeline-components:2.4.1
+pipelineInfo:
+  name: mlops-scheduler-tutorial
+root:
+  dag:
+    outputs:
+      artifacts:
+        evaluate-model-experiment_metrics:
+          artifactSelectors:
+          - outputArtifactKey: evaluate-model-experiment_metrics
+            producerSubtask: exit-handler-1
+    tasks:
+      exit-handler-1:
+        componentRef:
+          name: comp-exit-handler-1
+        inputs:
+          parameters:
+            pipelinechannel--metric:
+              componentInputParameter: metric
+            pipelinechannel--project:
+              componentInputParameter: project
+            pipelinechannel--threshold:
+              componentInputParameter: threshold
+        taskInfo:
+          name: MLOps Continuous Training Pipeline
+      vertex-pipelines-notification-email:
+        cachingOptions:
+          enableCache: true
+        componentRef:
+          name: comp-vertex-pipelines-notification-email
+        dependentTasks:
+        - exit-handler-1
+        inputs:
+          parameters:
+            pipeline_task_final_status:
+              taskFinalStatus:
+                producerTask: exit-handler-1
+            recipients:
+              runtimeValue:
+                constant:
+                - kaushik.koilada@springml.com
+        taskInfo:
+          name: vertex-pipelines-notification-email
+        triggerPolicy:
+          strategy: ALL_UPSTREAM_TASKS_COMPLETED
+  inputDefinitions:
+    parameters:
+      metric:
+        parameterType: STRING
+      project:
+        defaultValue: springml-notebook-testing
+        isOptional: true
+        parameterType: STRING
+      threshold:
+        parameterType: NUMBER_DOUBLE
+  outputDefinitions:
+    artifacts:
+      evaluate-model-experiment_metrics:
+        artifactType:
+          schemaTitle: system.Metrics
+          schemaVersion: 0.0.1
+schemaVersion: 2.1.0
+sdkVersion: kfp-2.3.0
