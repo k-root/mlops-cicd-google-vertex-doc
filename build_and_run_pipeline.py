@@ -4,6 +4,7 @@ from google_cloud_pipeline_components.types import artifact_types
 from kfp import compiler,dsl
 from kfp.components import load_component_from_file
 from kfp.dsl import Input, Metrics, component, Output, Model, Dataset
+import os
 
 PROJECT_ID = "springml-notebook-testing"  # @param {type:"string"}
 REGION = "us-central1"  # @param {type: "string"}
