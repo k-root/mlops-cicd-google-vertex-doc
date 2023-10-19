@@ -79,7 +79,7 @@ if __name__=="__main__":
 
     job = aiplatform.PipelineJob(
         display_name=PIPELINE_NAME,
-        template_path="{}.json".format(PIPELINE_NAME),
+        template_path="{}.yaml".format(PIPELINE_NAME),
         pipeline_root=PIPELINE_ROOT,
         parameter_values={"metric": "r2_score", "threshold": 0.7},
         enable_caching=True
