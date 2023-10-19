@@ -1,5 +1,6 @@
 import kfp
 from google.cloud import aiplatform
+from google.cloud import storage
 from google_cloud_pipeline_components.types import artifact_types
 from kfp import compiler,dsl
 from kfp.components import load_component_from_file
@@ -84,3 +85,4 @@ if __name__=="__main__":
         enable_caching=True
 
     )
+    job.submit(experiment=EXPERIMENT_NAME)
