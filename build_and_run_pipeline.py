@@ -69,10 +69,10 @@ if __name__=="__main__":
     
     compiler.Compiler().compile(
         pipeline_func=pipeline,
-        package_path="mlops-cicd-google-vertex-doc/{}.yaml".format(PIPELINE_NAME),
+        package_path="./{}.yaml".format(PIPELINE_NAME),
     )
     upload_to_gcs(WORKING_DIR
-                  ,"mlops-cicd-google-vertex-doc/{}.yaml".format(PIPELINE_NAME))
+                  ,"./{}.yaml".format(PIPELINE_NAME))
     DISPLAY_NAME = PIPELINE_NAME
 
     job = aiplatform.PipelineJob(
