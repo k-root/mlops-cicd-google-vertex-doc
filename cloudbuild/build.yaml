@@ -1,0 +1,67 @@
+env:
+  SUBSTITUTIONS: "
+            _PROJECT=springml-notebook-testing,\
+            _REGION=us-central1,\
+            _BUCKET_NAME= springml-notebook-testing-mlops-artifacts,\
+            _PIPELINE_NAME=mlops-cicd,\
+            _PIPELINE_ROOT=pipeline_root/chicago-taxi-pipe,\
+            _REPO_NAME=mlops-cicd-google-vertex-doc,\
+            _REPO_URL=https://github.com/k-root/mlops-cicd-google-vertex-doc.git,\
+            _BRANCH=master,\
+            
+steps:
+- name: 'gcr.io/cloud-builders/git'
+  args: ['clone', '--single-branch', '--branch',
+         '$_BRANCH','$_REPO_URL',
+         '--depth', '1',
+         '--verbose']
+  id: 'Clone Repository'
+  
+- name: 'gcr.io/cloud-builders/gsutil'
+  args: ['cp', '*.py', '*.pkl', 'gs://$_BUCKET_NAME/$_PIPELINE_ROOT/modules']
+  dir: $_REPO_NAME
+  id: 'Copy Modules'
+  waitFor: ['Clone Repository']
+
+# - name: 'gcr.io/cloud-builders/gsutil'
+#   args: ['cp', '*.csv', 'gs://$_PROJECT-vertex-default/$_PIPELINE_NAME/data']
+#   dir: 'sentiment-analysis-tfx/modules/data'
+#   id: 'Copy Data'
+#   waitFor: ['Copy Modules']
+
+# - name: 'gcr.io/cloud-builders/gsutil'
+#   args: ['cp', '*.txt', 'gs://$_PROJECT-vertex-default/$_PIPELINE_NAME/best_hyperparameters']
+#   dir: 'sentiment-analysis-tfx/modules/best_hyperparameters'
+#   id: 'Copy Hyperparameter'
+#   waitFor: ['Copy Data']
+
+- name: 'gcr.io/$_PROJECT/mlops-vertex-kfp:latest'
+  entrypoint: 'python'
+  args: [ 'build_and_run_pipeline.py'
+        ]
+  dir: $_REPO_NAME
+  id: 'Compile and Run Pipeline'
+  waitFor: ['Copy Modules']
+
+# - name: 'gcr.io/$_PROJECT/cb-tfx:latest'
+#   entrypoint: 'tfx'
+#   args: ['pipeline', 'create',
+#           '--pipeline-path', 'kubeflow_v2_runner.py',
+#           '--engine', 'vertex',
+#           '--build-image'
+#         ]
+#   dir: 'sentiment-analysis-tfx/tfx-pipeline'
+#   id: 'Create Pipeline'
+#   waitFor: ['Compile Pipeline']  
+
+# - name: 'gcr.io/$_PROJECT/cb-tfx:latest'
+#   entrypoint: 'tfx'
+#   args: ['run', 'create',
+#           '--engine', 'vertex',
+#           '--pipeline-name', '$_PIPELINE_NAME',
+#           '--project', '$_PROJECT',
+#           '--region', '$_REGION'
+#         ]
+#   dir: 'sentiment-analysis-tfx/tfx-pipeline'
+#   id: 'Create Pipeline Run'
+#   waitFor: ['Create Pipeline']
