@@ -23,17 +23,6 @@ steps:
   id: 'Copy Modules'
   waitFor: ['Clone Repository']
 
-# - name: 'gcr.io/cloud-builders/gsutil'
-#   args: ['cp', '*.csv', 'gs://$_PROJECT-vertex-default/$_PIPELINE_NAME/data']
-#   dir: 'sentiment-analysis-tfx/modules/data'
-#   id: 'Copy Data'
-#   waitFor: ['Copy Modules']
-
-# - name: 'gcr.io/cloud-builders/gsutil'
-#   args: ['cp', '*.txt', 'gs://$_PROJECT-vertex-default/$_PIPELINE_NAME/best_hyperparameters']
-#   dir: 'sentiment-analysis-tfx/modules/best_hyperparameters'
-#   id: 'Copy Hyperparameter'
-#   waitFor: ['Copy Data']
 
 - name: 'gcr.io/$_PROJECT/mlops-vertex-kfp:latest'
   entrypoint: 'python'
@@ -42,26 +31,3 @@ steps:
   dir: $_REPO_NAME
   id: 'Compile and Run Pipeline'
   waitFor: ['Copy Modules']
-
-# - name: 'gcr.io/$_PROJECT/cb-tfx:latest'
-#   entrypoint: 'tfx'
-#   args: ['pipeline', 'create',
-#           '--pipeline-path', 'kubeflow_v2_runner.py',
-#           '--engine', 'vertex',
-#           '--build-image'
-#         ]
-#   dir: 'sentiment-analysis-tfx/tfx-pipeline'
-#   id: 'Create Pipeline'
-#   waitFor: ['Compile Pipeline']  
-
-# - name: 'gcr.io/$_PROJECT/cb-tfx:latest'
-#   entrypoint: 'tfx'
-#   args: ['run', 'create',
-#           '--engine', 'vertex',
-#           '--pipeline-name', '$_PIPELINE_NAME',
-#           '--project', '$_PROJECT',
-#           '--region', '$_REGION'
-#         ]
-#   dir: 'sentiment-analysis-tfx/tfx-pipeline'
-#   id: 'Create Pipeline Run'
-#   waitFor: ['Create Pipeline']
