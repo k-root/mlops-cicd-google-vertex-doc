@@ -6,11 +6,11 @@ steps:
          '--verbose']
   id: 'Clone Repository'
   
-# - name: 'gcr.io/cloud-builders/gsutil'
-#   args: ['cp', '*.py', '*.yaml', 'gs://springml-notebook-testing-mlops-artifacts/pipeline_root/chicago-taxi-pipe/modules']
-#   dir: 'mlops-cicd-google-vertex-doc'
-#   id: 'Copy Modules'
-#   waitFor: ['Clone Repository']
+- name: 'gcr.io/cloud-builders/gsutil'
+  args: ['cp', '*.py', '*.yaml', 'gs://springml-notebook-testing-mlops-artifacts/pipeline_root/chicago-taxi-pipe/modules']
+  dir: 'mlops-cicd-google-vertex-doc'
+  id: 'Copy Modules'
+  waitFor: ['Clone Repository']
 
 
 # - name: 'gcr.io/springml-notebook-testing/mlops-vertex-kfp:latest'
