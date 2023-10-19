@@ -13,12 +13,12 @@ steps:
   waitFor: ['Clone Repository']
 
 
-# - name: 'gcr.io/springml-notebook-testing/mlops-vertex-kfp:latest'
-#   # entrypoint: 'python'
-#   args: ['python', 'build_and_run_pipeline.py' ]
-#   dir: 'mlops-cicd-google-vertex-doc'
-#   id: 'Compile and Run Pipeline'
-#   waitFor: ['Copy Modules']
+- name: 'gcr.io/springml-notebook-testing/mlops-vertex-kfp:latest'
+  # entrypoint: 'python'
+  args: ['python', 'build_and_run_pipeline.py' ]
+  dir: 'mlops-cicd-google-vertex-doc'
+  id: 'Compile and Run Pipeline'
+  waitFor: ['Copy Modules']
 
 options:
   logging: CLOUD_LOGGING_ONLY
