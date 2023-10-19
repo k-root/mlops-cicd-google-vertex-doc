@@ -1,22 +1,22 @@
 steps:
 - name: 'gcr.io/cloud-builders/git'
   args: ['clone', '--single-branch', '--branch',
-         '${_BRANCH}','${_REPO_URL}',
+         'main','https://github.com/k-root/mlops-cicd-google-vertex-doc.git',
          '--depth', '1',
          '--verbose']
   id: 'Clone Repository'
   
 - name: 'gcr.io/cloud-builders/gsutil'
-  args: ['cp', '*.py', '*.yaml', 'gs://${_BUCKET_NAME}/${_PIPELINE_ROOT}/modules']
-  dir: '${_REPO_NAME}'
+  args: ['cp', '*.py', '*.yaml', 'gs://springml-notebook-testing-mlops-artifacts/pipeline_root/chicago-taxi-pipe/modules']
+  dir: 'mlops-cicd-google-vertex-doc'
   id: 'Copy Modules'
   waitFor: ['Clone Repository']
 
 
-- name: 'gcr.io/${_PROJECT}/mlops-vertex-kfp:latest'
+- name: 'gcr.io/springml-notebook-testing/mlops-vertex-kfp:latest'
   # entrypoint: 'python'
   args: ['python', 'build_and_run_pipeline.py' ]
-  dir: '${_REPO_NAME}'
+  dir: 'mlops-cicd-google-vertex-doc'
   id: 'Compile and Run Pipeline'
   waitFor: ['Copy Modules']
 substitutions: 
