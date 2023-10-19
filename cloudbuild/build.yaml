@@ -14,9 +14,8 @@ steps:
 
 
 - name: 'gcr.io/${_PROJECT}/mlops-vertex-kfp:latest'
-  entrypoint: 'python'
-  args: [ 'build_and_run_pipeline.py'
-        ]
+  # entrypoint: 'python'
+  args: ['python', 'build_and_run_pipeline.py' ]
   dir: '${_REPO_NAME}'
   id: 'Compile and Run Pipeline'
   waitFor: ['Copy Modules']
@@ -28,4 +27,4 @@ substitutions:
     _PIPELINE_ROOT=pipeline_root/chicago-taxi-pipe,\
     _REPO_NAME=mlops-cicd-google-vertex-doc,\
     _REPO_URL=https://github.com/k-root/mlops-cicd-google-vertex-doc.git,\
-    _BRANCH=master,\
+    _BRANCH=main
