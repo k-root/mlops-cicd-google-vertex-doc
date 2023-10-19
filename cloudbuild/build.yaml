@@ -1,23 +1,23 @@
 steps:
 - name: 'gcr.io/cloud-builders/git'
   args: ['clone', '--single-branch', '--branch',
-         '$_BRANCH','$_REPO_URL',
+         '${_BRANCH}','${_REPO_URL}',
          '--depth', '1',
          '--verbose']
   id: 'Clone Repository'
   
 - name: 'gcr.io/cloud-builders/gsutil'
-  args: ['cp', '*.py', '*.pkl', 'gs://$_BUCKET_NAME/$_PIPELINE_ROOT/modules']
-  dir: '$_REPO_NAME'
+  args: ['cp', '*.py', '*.yaml', 'gs://${_BUCKET_NAME}/${_PIPELINE_ROOT}/modules']
+  dir: '${_REPO_NAME}'
   id: 'Copy Modules'
   waitFor: ['Clone Repository']
 
 
-- name: 'gcr.io/$_PROJECT/mlops-vertex-kfp:latest'
+- name: 'gcr.io/${_PROJECT}/mlops-vertex-kfp:latest'
   entrypoint: 'python'
   args: [ 'build_and_run_pipeline.py'
         ]
-  dir: '$_REPO_NAME'
+  dir: '${_REPO_NAME}'
   id: 'Compile and Run Pipeline'
   waitFor: ['Copy Modules']
 substitutions: 
