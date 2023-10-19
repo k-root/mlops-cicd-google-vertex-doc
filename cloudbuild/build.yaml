@@ -19,3 +19,6 @@ steps:
 #   dir: 'mlops-cicd-google-vertex-doc'
 #   id: 'Compile and Run Pipeline'
 #   waitFor: ['Copy Modules']
+
+options:
+  logging: CLOUD_LOGGING_ONLY
