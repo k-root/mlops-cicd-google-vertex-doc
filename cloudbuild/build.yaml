@@ -1,14 +1,3 @@
-env:
-  SUBSTITUTIONS: "
-            _PROJECT=springml-notebook-testing,\
-            _REGION=us-central1,\
-            _BUCKET_NAME= springml-notebook-testing-mlops-artifacts,\
-            _PIPELINE_NAME=mlops-cicd,\
-            _PIPELINE_ROOT=pipeline_root/chicago-taxi-pipe,\
-            _REPO_NAME=mlops-cicd-google-vertex-doc,\
-            _REPO_URL=https://github.com/k-root/mlops-cicd-google-vertex-doc.git,\
-            _BRANCH=master,\
-            
 steps:
 - name: 'gcr.io/cloud-builders/git'
   args: ['clone', '--single-branch', '--branch',
@@ -19,7 +8,7 @@ steps:
   
 - name: 'gcr.io/cloud-builders/gsutil'
   args: ['cp', '*.py', '*.pkl', 'gs://$_BUCKET_NAME/$_PIPELINE_ROOT/modules']
-  dir: $_REPO_NAME
+  dir: '$_REPO_NAME'
   id: 'Copy Modules'
   waitFor: ['Clone Repository']
 
@@ -28,6 +17,15 @@ steps:
   entrypoint: 'python'
   args: [ 'build_and_run_pipeline.py'
         ]
-  dir: $_REPO_NAME
+  dir: '$_REPO_NAME'
   id: 'Compile and Run Pipeline'
   waitFor: ['Copy Modules']
+substitutions: 
+    _PROJECT=springml-notebook-testing,\
+    _REGION=us-central1,\
+    _BUCKET_NAME= springml-notebook-testing-mlops-artifacts,\
+    _PIPELINE_NAME=mlops-cicd,\
+    _PIPELINE_ROOT=pipeline_root/chicago-taxi-pipe,\
+    _REPO_NAME=mlops-cicd-google-vertex-doc,\
+    _REPO_URL=https://github.com/k-root/mlops-cicd-google-vertex-doc.git,\
+    _BRANCH=master,\
