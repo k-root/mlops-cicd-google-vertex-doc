@@ -45,10 +45,6 @@ steps:
          'main','https://github.com/k-root/mlops-cicd-google-vertex-doc',
          '--depth', '1',
          '--verbose']
-  secretEnv: ['USERNAME', 'PASSKEY']
-  # volumes:
-  # - name: 'ssh'
-  #   path: /root/.ssh
   id: 'Clone Repository'
   
 - name: 'gcr.io/cloud-builders/gsutil'
@@ -65,13 +61,13 @@ steps:
   id: 'Compile and Run Pipeline'
   waitFor: ['Copy Modules']
 
-availableSecrets:
-  secretManager:
-  - versionName: projects/springml-notebook-testing/secrets/git_passkey/versions/latest
-    env: 'PASSKEY'
-  - versionName: projects/springml-notebook-testing/secrets/git_username/versions/latest
-    env: 'USERNAME'
-  # - versionName: projects/springml-notebook-testing/secrets/github_ssh/versions/latest
-  #   env: 'SSH_KEY'
+# availableSecrets:
+#   secretManager:
+#   - versionName: projects/springml-notebook-testing/secrets/git_passkey/versions/latest
+#     env: 'PASSKEY'
+#   - versionName: projects/springml-notebook-testing/secrets/git_username/versions/latest
+#     env: 'USERNAME'
+#   # - versionName: projects/springml-notebook-testing/secrets/github_ssh/versions/latest
+#   #   env: 'SSH_KEY'
 options:
   logging: CLOUD_LOGGING_ONLY
