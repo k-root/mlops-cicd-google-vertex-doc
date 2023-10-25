@@ -4,7 +4,7 @@ steps:
          'main','https://$$PASSWORD@github.com/k-root/mlops-cicd-google-vertex-doc.git',
          '--depth', '1',
          '--verbose']
-  secretEnv: ['USERNAME', 'PASSWORD']
+  secretEnv: ['PASSWORD']
   id: 'Clone Repository'
   
 - name: 'gcr.io/cloud-builders/gsutil'
@@ -23,9 +23,7 @@ steps:
 
 availableSecrets:
   secretManager:
-  - versionName: projects/746365374287/secrets/git_passkey/versions/1
+  - versionName: projects/springml-notebook-testing/secrets/git_passkey/versions/latest
     env: 'PASSWORD'
-  - versionName: projects/746365374287/secrets/git_username/versions/1
-    env: 'USERNAME'
 options:
   logging: CLOUD_LOGGING_ONLY
