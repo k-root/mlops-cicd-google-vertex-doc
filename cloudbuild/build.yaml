@@ -3,12 +3,12 @@ steps:
   args: ['config', '--global', 'user.name',
          '$$USERNAME']
   secretEnv: ['USERNAME']
-  id: 'Set git env'
+  id: 'Set git env username'
 - name: 'gcr.io/cloud-builders/git'
   args: ['config', '--global', 'user.password',
          '$$PASSWORD']
   secretEnv: ['PASSWORD']
-  id: 'Set git env'
+  id: 'Set git env password'
 - name: 'gcr.io/cloud-builders/git'
   args: ['clone', '--single-branch', '--branch',
          'main','https://github.com/k-root/mlops-cicd-google-vertex-doc.git',
