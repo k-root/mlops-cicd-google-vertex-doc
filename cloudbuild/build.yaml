@@ -1,7 +1,7 @@
 steps:
 - name: 'gcr.io/cloud-builders/git'
   args: ['clone', '--single-branch', '--branch',
-         'main','https://github.com/k-root/mlops-cicd-google-vertex-doc.git',
+         'main','https://$$USERNAME:$$PASSWORD@github.com/k-root/mlops-cicd-google-vertex-doc.git',
          '--depth', '1',
          '--verbose']
   id: 'Clone Repository'
@@ -20,5 +20,11 @@ steps:
   id: 'Compile and Run Pipeline'
   waitFor: ['Copy Modules']
 
+availableSecrets:
+  secretManager:
+  - versionName: projects/746365374287/secrets/git_passkey
+    env: 'PASSWORD'
+  - versionName: projects/746365374287/secrets/git_username
+    env: 'USERNAME'
 options:
   logging: CLOUD_LOGGING_ONLY
