@@ -14,12 +14,41 @@ steps:
 #          'git@github.com:$$USERNAME/mlops-cicd-google-vertex-doc.git']
 #   secretEnv: ['USERNAME']
 #   id: 'Set git env'
+
+# Access the id_github file from Secret Manager, and setup SSH
+steps:
+- name: 'gcr.io/cloud-builders/git'
+  secretEnv: ['SSH_KEY']
+  entrypoint: 'bash'
+  args:
+  - -c
+  - |
+    echo "$$SSH_KEY" >> /root/.ssh/id_rsa
+    chmod 400 /root/.ssh/id_rsa
+  volumes:
+  - name: 'ssh'
+    path: /root/.ssh
+
+# Clone the repository
+# - name: 'gcr.io/cloud-builders/git'
+#   args:
+#   - clone
+#   - --recurse-submodules
+#   - git@github.com:GIT_USERNAME/GIT_REPOSITORY
+#   volumes:
+#   - name: 'ssh'
+#     path: /root/.ssh
+
+
 - name: 'gcr.io/cloud-builders/git'
   args: ['clone', '--single-branch', '--branch',
-         'main','https://$$USERNAME:$$PASSKEY@github.com/k-root/mlops-cicd-google-vertex-doc.git',
+         'main','git@github.com:$$USERNAME/mlops-cicd-google-vertex-doc',
          '--depth', '1',
          '--verbose']
   secretEnv: ['USERNAME', 'PASSKEY']
+  volumes:
+  - name: 'ssh'
+    path: /root/.ssh
   id: 'Clone Repository'
   
 - name: 'gcr.io/cloud-builders/gsutil'
@@ -42,5 +71,7 @@ availableSecrets:
     env: 'PASSKEY'
   - versionName: projects/springml-notebook-testing/secrets/git_username/versions/latest
     env: 'USERNAME'
+  - versionName: projects/springml-notebook-testing/secrets/github_ssh/versions/latest
+    env: 'SSH_KEY'
 options:
   logging: CLOUD_LOGGING_ONLY
