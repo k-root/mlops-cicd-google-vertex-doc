@@ -6,7 +6,7 @@ steps:
   id: 'Set git env'
 - name: 'gcr.io/cloud-builders/git'
   args: ['clone', '--single-branch', '--branch',
-         'main','https://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@github.com/k-root/mlops-cicd-google-vertex-doc.git',
+         'main','https://$$PASSWORD@github.com/k-root/mlops-cicd-google-vertex-doc.git',
          '--depth', '1',
          '--verbose']
   secretEnv: ['USERNAME', 'PASSWORD']
