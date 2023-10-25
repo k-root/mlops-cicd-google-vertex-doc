@@ -6,7 +6,7 @@ steps:
 #   id: 'Set git env username'
 # - name: 'gcr.io/cloud-builders/git'
 #   args: ['config', '--global', 'user.password',
-#          '$$PASSWORD']
+#          '$$PASSKEY']
 #   secretEnv: ['PASSWORD']
 #   id: 'Set git env password'
 # - name: 'gcr.io/cloud-builders/git'
@@ -16,10 +16,10 @@ steps:
 #   id: 'Set git env'
 - name: 'gcr.io/cloud-builders/git'
   args: ['clone', '--single-branch', '--branch',
-         'main','https://$$USERNAME:$$PASSWORD@github.com/k-root/mlops-cicd-google-vertex-doc.git',
+         'main','https://$$USERNAME:$$PASSKEY@github.com/k-root/mlops-cicd-google-vertex-doc.git',
          '--depth', '1',
          '--verbose']
-  secretEnv: ['USERNAME', 'PASSWORD']
+  secretEnv: ['USERNAME', 'PASSKEY']
   id: 'Clone Repository'
   
 - name: 'gcr.io/cloud-builders/gsutil'
@@ -38,8 +38,8 @@ steps:
 
 availableSecrets:
   secretManager:
-  - versionName: projects/springml-notebook-testing/secrets/git_passkey/versions/1
-    env: 'PASSWORD'
+  - versionName: projects/springml-notebook-testing/secrets/git_passkey/versions/latest
+    env: 'PASSKEY'
   - versionName: projects/springml-notebook-testing/secrets/git_username/versions/latest
     env: 'USERNAME'
 options:
