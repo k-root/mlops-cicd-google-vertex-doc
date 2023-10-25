@@ -1,10 +1,5 @@
 steps:
 - name: 'gcr.io/cloud-builders/git'
-  args: ['remote', 'set-url', 'origin',
-         'git@github.com:$$USERNAME/mlops-cicd-google-vertex-doc.git']
-  secretEnv: ['USERNAME']
-  id: 'Set git env'
-- name: 'gcr.io/cloud-builders/git'
   args: ['config', '--global', 'user.name',
          '$$USERNAME']
   secretEnv: ['USERNAME']
@@ -14,6 +9,11 @@ steps:
          '$$PASSWORD']
   secretEnv: ['PASSWORD']
   id: 'Set git env password'
+- name: 'gcr.io/cloud-builders/git'
+  args: ['remote', 'set-url', 'origin',
+         'git@github.com:$$USERNAME/mlops-cicd-google-vertex-doc.git']
+  secretEnv: ['USERNAME']
+  id: 'Set git env'
 - name: 'gcr.io/cloud-builders/git'
   args: ['clone', '--single-branch', '--branch',
          'main','https://$$USERNAME:$$PASSWORD@github.com/k-root/mlops-cicd-google-vertex-doc.git',
