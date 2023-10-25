@@ -4,6 +4,7 @@ steps:
          'main','https://$$USERNAME:$$PASSWORD@github.com/k-root/mlops-cicd-google-vertex-doc.git',
          '--depth', '1',
          '--verbose']
+  secretEnv: ['USERNAME', 'PASSWORD']
   id: 'Clone Repository'
   
 - name: 'gcr.io/cloud-builders/gsutil'
