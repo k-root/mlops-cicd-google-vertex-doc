@@ -59,7 +59,7 @@ steps:
   args: ['python', 'build_and_run_pipeline.py' ]
   dir: 'mlops-cicd-google-vertex-doc'
   id: 'Compile and Run Pipeline'
-  waitFor: ['Copy Modules']
+  # waitFor: ['Copy Modules']
 
 # availableSecrets:
 #   secretManager:
