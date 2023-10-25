@@ -1,14 +1,14 @@
 steps:
 - name: 'gcr.io/cloud-builders/git'
   args: ['remote', 'set-url', 'origin',
-         'git@github.com:$$USERNAME/repo.git']
+         'git@github.com:$$USERNAME/mlops-cicd-google-vertex-doc.git']
   secretEnv: ['USERNAME']
   id: 'Set git env'
-- name: 'gcr.io/cloud-builders/git'
-  args: ['config', '--global', 'user.name',
-         '$$USERNAME']
-  secretEnv: ['USERNAME']
-  id: 'Set git env username'
+# - name: 'gcr.io/cloud-builders/git'
+#   args: ['config', '--global', 'user.name',
+#          '$$USERNAME']
+#   secretEnv: ['USERNAME']
+#   id: 'Set git env username'
 - name: 'gcr.io/cloud-builders/git'
   args: ['config', '--global', 'user.password',
          '$$PASSWORD']
