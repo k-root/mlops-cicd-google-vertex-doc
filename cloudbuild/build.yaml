@@ -71,7 +71,7 @@ availableSecrets:
     env: 'PASSKEY'
   - versionName: projects/springml-notebook-testing/secrets/git_username/versions/latest
     env: 'USERNAME'
-  - versionName: projects/springml-notebook-testing/secrets/github_ssh/versions/latest
-    env: 'SSH_KEY'
+  # - versionName: projects/springml-notebook-testing/secrets/github_ssh/versions/latest
+  #   env: 'SSH_KEY'
 options:
   logging: CLOUD_LOGGING_ONLY
