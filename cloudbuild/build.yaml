@@ -23,9 +23,9 @@ steps:
 
 availableSecrets:
   secretManager:
-  - versionName: projects/746365374287/secrets/git_passkey
+  - versionName: projects/746365374287/secrets/git_passkey/versions/1
     env: 'PASSWORD'
-  - versionName: projects/746365374287/secrets/git_username
+  - versionName: projects/746365374287/secrets/git_username/versions/1
     env: 'USERNAME'
 options:
   logging: CLOUD_LOGGING_ONLY
