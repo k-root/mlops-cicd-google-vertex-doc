@@ -61,7 +61,8 @@ steps:
 
 - name: 'gcr.io/cloud-builders/gsutil'
   args: ['cp', 'training_package/dist/trainer-0.1.tar.gz', 'gs://springml-notebook-testing-mlops-artifacts']
-  waitFor: ['-']
+  waitFor: ['Build python application package']
+  id: 'Upload package to GCS'
 # gsutil cp training_package/dist/trainer-0.1.tar.gz $BUCKET_URI/
 
 - name: 'gcr.io/springml-notebook-testing/mlops-vertex-kfp:latest'
@@ -69,7 +70,7 @@ steps:
   args: ['python', 'run_pipeline.py' ]
   dir: 'mlops-cicd-google-vertex-doc'
   id: 'Run Pipeline'
-  waitFor: ['-']
+  waitFor: ['Upload package to GCS']
 
 # availableSecrets:
 #   secretManager:
