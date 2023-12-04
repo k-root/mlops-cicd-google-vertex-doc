@@ -52,9 +52,9 @@ steps:
 #   dir: 'mlops-cicd-google-vertex-doc'
 #   id: 'Copy Modules'
 #   waitFor: ['Clone Repository']
-- name: 'gcr.io/springml-notebook-testing/mlops-vertex-kfp:latest'
-  # entrypoint: 'python'
-  args: ['python', 'setup.py', 'sdist', '--formats=gztar' ]
+- name: 'python'
+  entrypoint: 'python'
+  args: ['setup.py', 'sdist', '--formats=gztar' ]
   dir: 'mlops-cicd-google-vertex-doc/training_package'
   id: 'Build python application package'
   waitFor: ['-']
