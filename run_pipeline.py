@@ -1,5 +1,5 @@
 from kfp import dsl
-from kfp.dsl import importer
+from kfp.dsl import importer, OneOf
 from google_cloud_pipeline_components.v1.custom_job import CustomTrainingJobOp
 from google_cloud_pipeline_components.types import artifact_types
 from google_cloud_pipeline_components.v1.model import ModelUploadOp
@@ -95,7 +95,7 @@ def custom_model_training_evaluation_pipeline(
                                     unmanaged_container_model=import_unmanaged_model_task.outputs["artifact"],
                                 )
         # Get the model (or model version)
-        model_resource = dsl.OneOf(model_version_upload_op.outputs["model"], model_upload_op.outputs["model"])
+        model_resource = OneOf(model_version_upload_op.outputs["model"], model_upload_op.outputs["model"])
         
         # Batch prediction
         batch_predict_task = ModelBatchPredictOp(
