@@ -8,7 +8,8 @@ from google_cloud_pipeline_components.v1.model_evaluation import ModelEvaluation
 from google_cloud_pipeline_components.v1.vertex_notification_email import VertexNotificationEmailOp    
 from google.cloud import aiplatform
 from kfp import compiler 
-import os
+import os 
+from kfp.registry import RegistryClient
 
 PROJECT_ID = "springml-notebook-testing"  # @param {type:"string"}
 REGION = "us-central1"  # @param {type: "string"}
@@ -20,6 +21,8 @@ PIPELINE_NAME = "vertex-pipeline-scheduler-tutorial"
 WORKING_DIR = f"{PIPELINE_ROOT}/{UUID}"
 os.environ['AIP_MODEL_DIR'] = WORKING_DIR
 EXPERIMENT_NAME = PIPELINE_NAME + "-experiment"
+host = f"https://{REGION}-kfp.pkg.dev/{PROJECT_ID}/{REPO_NAME}"
+REPO_NAME ="mlops-continuous-training-repo"
 
 # define the train-deploy pipeline
 @dsl.pipeline(name="custom-model-training-evaluation-pipeline")
@@ -162,13 +165,8 @@ if __name__=="__main__":
         pipeline_func=custom_model_training_evaluation_pipeline,
         package_path="pipeline.yaml",
     )
+
     
-    from kfp.registry import RegistryClient
-
-
-    host = f"https://{REGION}-kfp.pkg.dev/{PROJECT_ID}/{REPO_NAME}"
-    REPO_NAME ="mlops-continuous-training-repo"
-    REGION="us-central1"
     client = RegistryClient(host=host)
     TEMPLATE_NAME, VERSION_NAME = client.upload_pipeline(
       file_name="pipeline.yaml",
