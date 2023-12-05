@@ -21,8 +21,8 @@ PIPELINE_NAME = "vertex-pipeline-scheduler-tutorial"
 WORKING_DIR = f"{PIPELINE_ROOT}/{UUID}"
 os.environ['AIP_MODEL_DIR'] = WORKING_DIR
 EXPERIMENT_NAME = PIPELINE_NAME + "-experiment"
-host = f"https://{REGION}-kfp.pkg.dev/{PROJECT_ID}/{REPO_NAME}"
 REPO_NAME ="mlops-continuous-training-repo"
+host = f"https://{REGION}-kfp.pkg.dev/{PROJECT_ID}/{REPO_NAME}"
 
 # define the train-deploy pipeline
 @dsl.pipeline(name="custom-model-training-evaluation-pipeline")
