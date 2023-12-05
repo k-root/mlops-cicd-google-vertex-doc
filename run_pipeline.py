@@ -8,8 +8,8 @@ from google_cloud_pipeline_components.v1.model_evaluation import ModelEvaluation
 from google_cloud_pipeline_components.v1.vertex_notification_email import VertexNotificationEmailOp    
 from google.cloud import aiplatform
 from kfp import compiler 
-
 import os
+
 PROJECT_ID = "springml-notebook-testing"  # @param {type:"string"}
 REGION = "us-central1"  # @param {type: "string"}
 BUCKET_NAME = f"{PROJECT_ID}-mlops-artifacts"
@@ -123,60 +123,76 @@ def custom_model_training_evaluation_pipeline(
         
     return
 
-worker_pool_specs = [{
-                        "machine_spec": {"machine_type": "e2-highmem-2"},
-                        "replica_count": 1,
-                        "python_package_spec":{
-                                "executor_image_uri": "us-docker.pkg.dev/vertex-ai/training/sklearn-cpu.1-0:latest", 
-                                "package_uris": [f"{BUCKET_URI}/trainer-0.1.tar.gz"],
-                                "python_module": "trainer.task",
-                                "args":["--training-dir",f"/gcs/{BUCKET_NAME}"]
-                        },
-}]
+if __name__=="__main__": 
 
-parameters = {
-    "project": PROJECT_ID,
-    "location": REGION,
-    "training_job_display_name": "taxifare-prediction-training-job",
-    "worker_pool_specs": worker_pool_specs,
-    "base_output_dir": BUCKET_URI,
-    "prediction_container_uri": "us-docker.pkg.dev/vertex-ai/prediction/sklearn-cpu.1-0:latest",
-    "model_display_name": "taxifare-prediction-model",
-    "batch_prediction_job_display_name": "taxifare-prediction-batch-job",
-    "target_field_name": "fare",
-    "test_data_gcs_uri": [f"{BUCKET_URI}/test_no_target.csv"],
-    "ground_truth_gcs_source": [f"{BUCKET_URI}/test.csv"],
-    "batch_predictions_gcs_prefix": f"{BUCKET_URI}/batch_predict_output",
-    # "batch_predictions_input_format": "csv",
-    # "batch_predictions_output_format": "jsonl",
-    # "ground_truth_format": "csv",
-    # "parent_model_resource_name": None,
-    # "parent_model_artifact_uri": None,
-    "existing_model": False
-}
+    worker_pool_specs = [{
+                            "machine_spec": {"machine_type": "e2-highmem-2"},
+                            "replica_count": 1,
+                            "python_package_spec":{
+                                    "executor_image_uri": "us-docker.pkg.dev/vertex-ai/training/sklearn-cpu.1-0:latest", 
+                                    "package_uris": [f"{BUCKET_URI}/trainer-0.1.tar.gz"],
+                                    "python_module": "trainer.task",
+                                    "args":["--training-dir",f"/gcs/{BUCKET_NAME}"]
+                            },
+    }]
+
+    parameters = {
+        "project": PROJECT_ID,
+        "location": REGION,
+        "training_job_display_name": "taxifare-prediction-training-job",
+        "worker_pool_specs": worker_pool_specs,
+        "base_output_dir": BUCKET_URI,
+        "prediction_container_uri": "us-docker.pkg.dev/vertex-ai/prediction/sklearn-cpu.1-0:latest",
+        "model_display_name": "taxifare-prediction-model",
+        "batch_prediction_job_display_name": "taxifare-prediction-batch-job",
+        "target_field_name": "fare",
+        "test_data_gcs_uri": [f"{BUCKET_URI}/test_no_target.csv"],
+        "ground_truth_gcs_source": [f"{BUCKET_URI}/test.csv"],
+        "batch_predictions_gcs_prefix": f"{BUCKET_URI}/batch_predict_output",
+        # "batch_predictions_input_format": "csv",
+        # "batch_predictions_output_format": "jsonl",
+        # "ground_truth_format": "csv",
+        # "parent_model_resource_name": None,
+        # "parent_model_artifact_uri": None,
+        "existing_model": False
+    }
 
 
-compiler.Compiler().compile(
-    pipeline_func=custom_model_training_evaluation_pipeline,
-    package_path="pipeline.yaml",
-)
+    compiler.Compiler().compile(
+        pipeline_func=custom_model_training_evaluation_pipeline,
+        package_path="pipeline.yaml",
+    )
+    
+    from kfp.registry import RegistryClient
 
-# aiplatform.init(project= "springml-notebook-testing", 
-#                  location= "us-central1")
 
-aiplatform.init(
-    project=PROJECT_ID, 
-    staging_bucket=BUCKET_URI, 
-    location=REGION,
-    experiment=EXPERIMENT_NAME)
+    host = f"https://{REGION}-kfp.pkg.dev/{PROJECT_ID}/{REPO_NAME}"
+    REPO_NAME ="mlops-continuous-training-repo"
+    REGION="us-central1"
+    client = RegistryClient(host=host)
+    TEMPLATE_NAME, VERSION_NAME = client.upload_pipeline(
+      file_name="pipeline.yaml",
+      tags=["v1", "latest"],
+      extra_headers={"description":"This is an example pipeline template."})
 
-aiplatform.autolog()
+    TEMPLATE_URI = f"https://{REGION}-kfp.pkg.dev/{PROJECT_ID}/{REPO_NAME}/{TEMPLATE_NAME}/latest"
 
-job = aiplatform.PipelineJob(
-    display_name="scheduled_custom_regression_evaluation",
-    template_path="pipeline.yaml",
-    parameter_values=parameters,
-    pipeline_root=BUCKET_URI,
-    enable_caching=True
-)
-job.submit(experiment=EXPERIMENT_NAME)
+    # aiplatform.init(project= "springml-notebook-testing", 
+    #                  location= "us-central1")
+
+    aiplatform.init(
+        project=PROJECT_ID, 
+        staging_bucket=BUCKET_URI, 
+        location=REGION,
+        experiment=EXPERIMENT_NAME)
+
+    aiplatform.autolog()
+
+    job = aiplatform.PipelineJob(
+        display_name="scheduled_custom_regression_evaluation",
+        template_path=TEMPLATE_URI,
+        parameter_values=parameters,
+        pipeline_root=BUCKET_URI,
+        enable_caching=False
+    )
+    job.submit(experiment=EXPERIMENT_NAME)
